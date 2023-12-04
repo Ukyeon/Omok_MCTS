@@ -2,7 +2,7 @@ import pygame as p
 import qlearningAgents
 import multiAgents
 from gameState import create_env
-from dqn import run_dqn
+# from dqn import run_dqn
 from time import time, sleep
 
 WIDTH = 600
@@ -63,12 +63,12 @@ def main():
         elif cmd == '2':
             running = 2
             gs.reset()
-            agent = multiAgents.AlphaBetaAgent(depth=2, dimension= DIMENSION-2)
+            agent = multiAgents.AlphaBetaAgent(depth=3, dimension= DIMENSION-2)
         elif cmd == '3':
             running = 3
             # gs.win_history = [0, 0, 0]
             gs.reset()
-            ma = multiAgents.AlphaBetaAgent(depth=5, dimension= DIMENSION-2)
+            ma = multiAgents.AlphaBetaAgent(depth=3, dimension= DIMENSION-2)
             ngames = int(input("How many times you want to run games for RL vs MinMax? "))
         elif cmd == '4':
             running = 4
