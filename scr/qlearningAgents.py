@@ -15,8 +15,12 @@
 from featureExtractors import *
 from tqdm import trange
 from dqn import ExponentialSchedule
-import random,util
-
+import random
+import util
+from collections import defaultdict
+from typing import Sequence, Callable, Tuple
+import math
+import numpy as np
 
 class QLearningAgent:
     """
@@ -95,21 +99,20 @@ class QLearningAgent:
         ans = []
         legalActions = self.getLegalActions(state)
         
-        
         if legalActions == [] or state == 'TERMINAL_STATE':
             return None
 
-        max = self.computeValueFromQValues(state) # To pick max from Q value states
+        max = self.computeValueFromQValues(state)  # To pick max from Q value states
 
         for action in legalActions:
             if max == self.getQValue(state, action):
                 ans.append(action)
 
         if ans == []:
-            #print("No Q-value! Choose random. ", max, legalActions)
+            # print("No Q-value! Choose random. ", max, legalActions)
             ans.append(random.choice(legalActions))
 
-        return random.choice(ans) # To pick randomly from a list in the maximum options
+        return random.choice(ans)  # To pick randomly from a list in the maximum options
 
 
     def getAction(self, state):
@@ -287,14 +290,14 @@ class ApproximateQAgent(OmokQAgent):
                     if gs.player_turn >= gs.dimension * gs.dimension:  # Draw
                         self.update(prev_gs, action, gs, 0)
                     elif gs.getColor(row, col) == 'white':  # Black lose
-                        self.update(prev_gs, action, gs, -1)
+                        self.update(prev_gs, action, gs, -10)
                     else:
-                        self.update(prev_gs, action, gs, 1)  # Black win
+                        self.update(prev_gs, action, gs, 10)  # Black win
                     gs.reset()
                     self.featExtractor.resetFeatures()
                     studying += 1
                 else:
-                    self.update(prev_gs, action, gs, 0)
+                    self.update(prev_gs, action, gs, -0.1)
 
                 if studying > 100:  # TBD: How long are you studying?
                     studying = 0
@@ -306,7 +309,7 @@ class ApproximateQAgent(OmokQAgent):
         for i in trange(num_games, desc="ApproximateQAgent Learning"):
             studying = 1
             # explore_rate = 0.9 - (i * 0.001)
-            exploration = ExponentialSchedule(1.0, 0.01, 1_000_000)
+            exploration = ExponentialSchedule(1.0, 0.01, num_games)
             self.explorationProb(exploration.value(i))
 
             while studying:
@@ -336,7 +339,7 @@ class ApproximateQAgent(OmokQAgent):
                     gs.print_history()
                     gs.reset()
                 else:
-                    if gs.getPlayerTurn() % 1 == 0:  # RL turn
+                    if gs.getPlayerTurn() % 2 == 1:  # RL turn
                         qa.update(prev_gs, action, gs, -1)
 
 
@@ -353,26 +356,46 @@ class ApproximateQAgent(OmokQAgent):
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
 
-    def __init__(self, exploration_weight=1):
+    def __init__(self, exploration_weight=1, **args):
+        OmokQAgent.__init__(self, **args)
         self.Q = defaultdict(int)  # total reward of each node
         self.N = defaultdict(int)  # total visit count for each node
         self.children = dict()  # children of each node
         self.exploration_weight = exploration_weight
 
-    def choose(self, node):
+    def getAction(self, state):
         "Choose the best successor of node. (Choose a move in the game)"
-        if node.is_terminal():
-            raise RuntimeError(f"choose called on terminal node {node}")
-
-        if node not in self.children:
-            return node.find_random_child()
+        legalActions = self.getLegalActions(state)
+        if legalActions == []:
+            print("TERMINAL_STATE!!!!", state)
+            return None
 
         def score(n):
             if self.N[n] == 0:
                 return float("-inf")  # avoid unseen moves
             return self.Q[n] / self.N[n]  # average reward
 
-        return max(self.children[node], key=score)
+        if state.getPlayerTurn() == 0:
+            return state.getCenter()
+        elif util.flipCoin(self.epsilon):  # To pick randomly from a list, especially in beginning
+            action = random.choice(legalActions)
+        else:
+            action = max(self.children[legalActions], key=score)  # self.getPolicy(state)
+
+        return action
+
+        # if node.is_terminal():
+        #     raise RuntimeError(f"choose called on terminal node {node}")
+        #
+        # if node not in self.children:
+        #     return node.find_random_child()
+        #
+        # def score(n):
+        #     if self.N[n] == 0:
+        #         return float("-inf")  # avoid unseen moves
+        #     return self.Q[n] / self.N[n]  # average reward
+        #
+        # return max(self.children[node], key=score)
 
     def do_rollout(self, node):
         "Make the tree one layer better. (Train for one iteration.)"
@@ -443,149 +466,90 @@ class MCTSagent(OmokQAgent):
        You should only have to overwrite getQValue and update.
        All other QLearningAgent functions should work as is.
     """
-    def __init__(self, extractor='IdentityExtractor', **args):
+    def __init__(self, depth, exploration_weight, **args):
         OmokQAgent.__init__(self, **args)
-        self.T
-        self.depth
-        self.explorationC
-        self.rolloutPolicy
-        self.count
-        self.values
+        self.T = defaultdict(int)
+        self.depth = depth
+        self.exploration_weight = exploration_weight
+        self.rolloutPolicy = self.epsilon_policy
+        # self.Q = defaultdict()  # total reward of each node
+        self.N = defaultdict()  # total visit count for each node
+
+    def epsilon_policy(self, Q: defaultdict, epsilon: float) -> Callable:
+        """Creates an epsilon soft policy from Q values.
+
+        A policy is represented as a function here because the policies are simple. More complex policies can be represented using classes.
+
+        Args:
+            Q (defaultdict): current Q-values
+            epsilon (float): softness parameter
+        Returns:
+            get_action (Callable): Takes a state as input and outputs an action
+        """
+        # Get number of actions
+        num_actions = len(Q[0])
+        choices = []
+        for i, _ in enumerate(range(num_actions)):
+            choices.append(i)
+
+        def get_action(state: Tuple) -> int:
+            if np.random.random() < epsilon:
+                action = np.random.choice(choices)  # Explore
+            else:
+                action = self.argmax(Q[state])  # Exploit
+
+            return action
+
+        return get_action
+
+    def argmax(self, arr: Sequence[float]) -> int:
+        """Argmax that breaks ties randomly
+
+        Takes in a list of values and returns the index of the item with the highest value, breaking ties randomly.
+
+        Note: np.argmax returns the first index that matches the maximum, so we define this method to use in EpsilonGreedy and UCB agents.
+        Args:
+            arr: sequence of values
+        """
+
+        max_value = max(arr)
+        max_index = [i for i, val in enumerate(arr) if max_value == val]
+        return np.random.choice(max_index)
 
     def selectAction(self, state, depth):
+        times = 10
+        for i in range(times):
+            self.simulate(state, depth, self.epsilon_policy)
+        return self.getAction(state)
 
-        return self.weights
+    def simulate(self, state, dept, policy):
+        "Roll out(simulate) using rollout policy pi0."
 
-    def getQValue(self, state, action):
-        """
-          Should return Q(state,action) = w * featureVector
-          where * is the dotProduct operator
-        """
-        "*** YOUR CODE HERE ***"
-        sum = 0
-        featureVector = self.featExtractor.getFeatures(state, action)
-        # learns weights for features of states, where many states might share the same features.
-        for f in featureVector:
-            sum += self.weights[f] * featureVector[f]
+        if dept == 0:
+            return 0
+        if state not in self.T:
+            legalActions = self.getLegalActions(state)
+            for action in legalActions:
+                self.Q[(state, action)] = 0
+                self.N[(state, action)] = 0
+                # Q = defaultdict(lambda: np.zeros(env.action_space.n))
+                # N = defaultdict(lambda: np.zeros(env.action_space.n))
+            self.T.append(state)
+            return self.rollout(state, dept, policy)
 
-        if sum > 100000:
-            print(sum)  # Debugging!
-
-        return sum
-
-    def update(self, state, action, nextState, reward):
-        """
-           Should update your weights based on transition
-        """
-        "*** YOUR CODE HERE ***"
-        featureVector = self.featExtractor.getFeatures(nextState, action)
-
-        val1 = self.getValue(nextState)
-        first = (reward + self.discount * val1)
-        second = self.getQValue(state, action)
-        difference = first - second
-
-        #print("reward:", reward, "self.discount", self.discount, "val1:", val1)
-        #print(difference, first, second)
-
-        # difference = (reward + self.discount * self.getValue(nextState)) - self.getQValue(state, action)
-        # update your weight vectors similarly to how you updated Q-values:
-        # print(difference)
-        # print(featureVector)
-
-        for f in featureVector:
-            self.weights[f] = self.weights[f] + self.alpha * difference * featureVector[f]
-            # print(f, self.weights[f])
-
-        # print("test")
-
-    def final(self, state):
-        "Called at the end of each game."
-        # call the super-class final method
-        OmokQAgent.final(self, state)
-
-        # did we finish training?
-        if self.episodesSoFar == self.numTraining:
-            # you might want to print your weights here for debugging
-            "*** YOUR CODE HERE ***"
-            pass
-
-    def train(self, num_steps, gs):
-        for i in trange(num_steps, desc="ApproximateQAgent Learning"):
-            studying = 1
-            #explore_rate = 0.9 - (i * 0.001)
-            exploration = ExponentialSchedule(1.0, 0.01, 1_000_000)
-            self.explorationProb(exploration.value(i))
-
-            while studying:
-                prev_gs = gs.deepCopy()
-                action = self.getAction(gs)
-                row, col = action
-                # print(row, col, gs.getPlayerTurn())
-                gs.updatePlayerTurn(row, col)
-
-                if gs.is_gameOver(row, col, gs.getColor(row, col)) == True:
-                    # print(gs)
-
-                    if gs.player_turn >= gs.dimension * gs.dimension:  # Draw
-                        self.update(prev_gs, action, gs, 0)
-                    elif gs.getColor(row, col) == 'white':  # Black lose
-                        self.update(prev_gs, action, gs, -1)
-                    else:
-                        self.update(prev_gs, action, gs, 1)  # Black win
-                    gs.reset()
-                    self.featExtractor.resetFeatures()
-                    studying += 1
-                else:
-                    self.update(prev_gs, action, gs, 0)
-
-                if studying > 100:  # TBD: How long are you studying?
-                    studying = 0
-
-            # print(gs.win_history, "Please wait. Now learning...", i + 1, "/ 100")
-            # gs.win_history = [0, 0, 0]
-
-    def train_vs_AI(self, num_games, gs, qa, ma):
-        for i in trange(num_games, desc="ApproximateQAgent Learning"):
-            studying = 1
-            # explore_rate = 0.9 - (i * 0.001)
-            exploration = ExponentialSchedule(1.0, 0.01, 1_000_000)
-            self.explorationProb(exploration.value(i))
-
-            while studying:
-                prev_gs = gs.deepCopy()
-
-                if gs.getPlayerTurn() % 2 == 0:  # RL turn
-                    agent = qa
-                else:
-                    agent = ma
-
-                action = agent.getAction(gs)
-                col, row = action
-                gs.updatePlayerTurn(col, row)
-
-                if gs.is_gameOver(col, row, gs.getColor(col, row)) == True:
-                    # print(gs)
-                    # print(gs.win_history)
-                    studying = 0
-
-                    if gs.getPlayerTurn() >= gs.dimension * gs.dimension:  # Draw
-                        qa.update(prev_gs, action, gs, 0)
-                    elif gs.getPlayerTurn() % 2 == 1:  # RL turn
-                        qa.update(prev_gs, action, gs, 100)
-                    else:
-                        qa.update(prev_gs, action, gs, -100)  # LOSE
-
-                    gs.reset()
-                else:
-                    if gs.getPlayerTurn() % 1 == 0:  # RL turn
-                        qa.update(prev_gs, action, gs, -1)
+        action = self.selection(state)
 
 
-    def print(self):
-        """
-           Debugging
-        """
-        print("last explorationProb:", self.epsilon)
-        for key, value in self.weights.items():
-            print(key, value)
+    def selection(self, state):
+        legalActions = self.getLegalActions(state)
+        log_N_vertex = 0
+        for action in legalActions:
+            log_N_vertex += self.N[(state, action)]
+
+        # Define a function to calculate the equation for each action
+        def ucb_tree(action):
+            return self.Q[(state, action)] + self.exploration_weight * math.sqrt(log_N_vertex / self.N[(state, action)])
+
+        # Get the action with maximum value using max function with a custom key
+        return max(legalActions, key=ucb_tree)
+

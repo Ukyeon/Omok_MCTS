@@ -32,7 +32,7 @@ def main():
     gs = create_env(dimension=DIMENSION-2)  #gameState.GameState(dimension=DIMENSION-2)
 
     # Initialize the Approximate Q-learning Agent
-    qa = qlearningAgents.ApproximateQAgent(alpha=0.001, gamma=0.9, dimension=DIMENSION-2)
+    qa = qlearningAgents.ApproximateQAgent(alpha=0.002, gamma=0.96, dimension=DIMENSION-2)
 
     load_images()
     num_steps = 100
@@ -63,18 +63,23 @@ def main():
         elif cmd == '2':
             running = 2
             gs.reset()
-            agent = multiAgents.AlphaBetaAgent(depth = 2, dimension= DIMENSION-2)
+            agent = multiAgents.AlphaBetaAgent(depth=2, dimension= DIMENSION-2)
         elif cmd == '3':
             running = 3
             # gs.win_history = [0, 0, 0]
             gs.reset()
-            ma = multiAgents.AlphaBetaAgent(depth = 2, dimension= DIMENSION-2)
+            ma = multiAgents.AlphaBetaAgent(depth=5, dimension= DIMENSION-2)
             ngames = int(input("How many times you want to run games for RL vs MinMax? "))
+        elif cmd == '4':
+            running = 4
+            gs.reset()
+            ma = qlearningAgents.MCTSagent(depth=2, exploration_weight=1, dimension= DIMENSION-2)
+            ngames = int(input("How many times you want to run games for RL vs MCTS? "))
         else:
             break
 
         while running > 0:
-            if running == 3:  # AI mode
+            if running >= 3:  # AI mode
                 qa.train_vs_AI(ngames, gs, qa, ma)
                 running = 0
                 gs.print_history()
@@ -85,11 +90,8 @@ def main():
                 if gs.getPlayerTurn() % 2 == 0 : # AI turn 
                     action = agent.getAction(gs)
                     col, row = action
-                    gs.updatePlayerTurn(col, row)
-                    # print(col, row, gs.getPlayerTurn())
-                    # print(gs)
 
-                else :  # Your turn
+                else:  # Your turn
                     for e in p.event.get():
                         if e.type == p.QUIT:
                             running = False
@@ -111,10 +113,13 @@ def main():
                 
                     if gs.getPlayerTurn() >= gs.dimension * gs.dimension: # Draw
                         qa.update(prev_gs, action, gs, -1)
+                        print("Game Over. Draw.")
                     elif gs.getPlayerTurn() % 2 == 0 : # RL turn
-                        qa.update(prev_gs, action, gs, 100)
+                        qa.update(prev_gs, action, gs, -100)
+                        print("Game Over. You Win!!")
                     else:
-                        qa.update(prev_gs, action, gs, -100) # LOSE
+                        qa.update(prev_gs, action, gs, 100) # LOSE
+                        print("Game Over. You Lose.")
                 
             drawGameState(screen, gs, sqSelected)
             clock.tick(MAX_FPS)
@@ -130,7 +135,7 @@ def main():
             # screen.blit(player_display, (200, 220))
             p.display.flip()
 
-        print("Game Over. Time elapsed: ", time() - start_time)
+        print("Time elapsed: ", time() - start_time)
 
 
 def drawGameState(screen, gs, sqSelected):

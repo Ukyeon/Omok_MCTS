@@ -34,7 +34,7 @@ class IdentityExtractor(FeatureExtractor):
     def getFeatures(self, state, action):
         features = util.Counter()
         features["bias"] = 1.0
-        # features["totalCount"] = state.getPlayerTurn()
+        features["totalCount"] = state.getPlayerTurn() * 0.01
 
         ori_x, ori_y = action
         color = state.getColor(ori_x, ori_y)
@@ -48,10 +48,15 @@ class IdentityExtractor(FeatureExtractor):
                 mat[ori_x][ori_y] = StonePiece(ori_x, ori_y, 'black')
 
         for r in range(state.dimension):
+            vertical_mat = [state.matrix[col][r] for col in range(state.dimension)]
             for col in stone:
-                tensor = self.calculate_tensor(mat[r], state.dimension, col)
+                tensor1 = self.calculate_tensor(mat[r], state.dimension, col)
                 key = self.getKey(col, r)
-                features[key] = tensor * 0.1
+                features[key] = tensor1 * 0.1
+
+                # tensor2 = self.calculate_tensor(vertical_mat, state.dimension, col)
+                # key = self.getKey(col, r + state.dimension)
+                # features[key] = tensor2 * 0.1
 
         if color is None:
             if state.getPlayerTurn() % 2 == 1:  # Even : black / Odd : white
@@ -192,73 +197,3 @@ class IdentityExtractor(FeatureExtractor):
 
         return ans
 
-
-class CoordinateExtractor(FeatureExtractor):
-    def getFeatures(self, state, action):
-        feats = util.Counter()
-        feats[state] = 1.0
-        feats['x=%d' % state[0]] = 1.0
-        feats['y=%d' % state[0]] = 1.0
-        feats['action=%s' % action] = 1.0
-        return feats
-
-def closestFood(pos, food, walls):
-    """
-    closestFood -- this is similar to the function that we have
-    worked on in the search project; here its all in one place
-    """
-    fringe = [(pos[0], pos[1], 0)]
-    expanded = set()
-    while fringe:
-        pos_x, pos_y, dist = fringe.pop(0)
-        if (pos_x, pos_y) in expanded:
-            continue
-        expanded.add((pos_x, pos_y))
-        # if we find a food at this location then exit
-        if food[pos_x][pos_y]:
-            return dist
-        # otherwise spread out from the location to its neighbours
-        nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
-        for nbr_x, nbr_y in nbrs:
-            fringe.append((nbr_x, nbr_y, dist+1))
-    # no food found
-    return None
-
-class SimpleExtractor(FeatureExtractor):
-    """
-    Returns simple features for a basic reflex Pacman:
-    - whether food will be eaten
-    - how far away the next food is
-    - whether a ghost collision is imminent
-    - whether a ghost is one step away
-    """
-
-    def getFeatures(self, state, action):
-        # extract the grid of food and wall locations and get the ghost locations
-        food = state.getFood()
-        walls = state.getWalls()
-        ghosts = state.getGhostPositions()
-
-        features = util.Counter()
-
-        features["bias"] = 1.0
-
-        # compute the location of pacman after he takes the action
-        x, y = state.getPacmanPosition()
-        dx, dy = Actions.directionToVector(action)
-        next_x, next_y = int(x + dx), int(y + dy)
-
-        # count the number of ghosts 1-step away
-        features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
-
-        # if there is no danger of ghosts then add the food feature
-        if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
-            features["eats-food"] = 1.0
-
-        dist = closestFood((next_x, next_y), food, walls)
-        if dist is not None:
-            # make the distance a number less than one otherwise the update
-            # will diverge wildly
-            features["closest-food"] = float(dist) / (walls.width * walls.height)
-        features.divideAll(10.0)
-        return features
