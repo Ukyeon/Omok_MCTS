@@ -1,0 +1,15 @@
+# Omok_MCTS
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C1.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C2.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C3.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C4.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C5.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C6.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C7.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C8.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C9.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C10.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C11.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C12.JPG?raw=true)
+![alt text](https://github.com/Ukyeon/Omok_MCTS/blob/main/pics/CS5180_Presentation/%EC%8A%AC%EB%9D%BC%EC%9D%B4%EB%93%9C13.JPG?raw=true)
+
