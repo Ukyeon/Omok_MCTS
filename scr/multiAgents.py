@@ -266,8 +266,10 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             legalMoves = self.getLegalActions(gameState) # My next action
 
             for action in legalMoves:
-                value = max(value, minValue(depth + 1, gameState.generateSuccessor(action), alpha, beta, action))
-                if value > beta : return value
+                successor, _, _ = gameState.generateSuccessor(action)
+                value = max(value, minValue(depth + 1, successor, alpha, beta, action))
+                if value > beta:
+                    return value
                 alpha = max(alpha, value)
             return value
 
@@ -280,7 +282,8 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             legalMoves = self.getLegalActions(gameState) # My next action
 
             for action in legalMoves:
-                value = min(value, maxValue(depth + 1, gameState.generateSuccessor(action), alpha, beta, action))
+                successor, _, _ = gameState.generateSuccessor(action)
+                value = min(value, maxValue(depth + 1, successor, alpha, beta, action))
 
                 if value < alpha: 
                     #print('agentIndex==:', agentIndex, 'NumAgents:', gameState.getNumAgents())
@@ -300,8 +303,8 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         ans = []
 
         for action in legalMoves:
-            tmp = minValue(0, gameState.generateSuccessor(action), alpha, beta, action) # start depth == 0, Myagent = 1
-            #print(action, tmp)
+            successor, _, _ = gameState.generateSuccessor(action)
+            tmp = minValue(0, successor, alpha, beta, action)
 
             if tmp > value:
                 value = tmp

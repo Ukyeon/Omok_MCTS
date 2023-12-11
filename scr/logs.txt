@@ -1,0 +1,3 @@
+0.05 5 0.99 0.001
+Finish learning. Time elapsed:  0.0
+Ready to play? (1: Human vs RL, 2: Human vs MinMax, 3: RL vs MinMax, 4: RL vs MCTS, 5: Quit) 

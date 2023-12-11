@@ -64,7 +64,7 @@ class GameState(Env):
         '''
 
         if self.player_turn >= self.dimension * self.dimension: # Draw
-            self.winCount('draw')
+            # self.winCount('draw')
             return True
 
         ori_x, ori_y = x, y
@@ -90,7 +90,7 @@ class GameState(Env):
                         break
                     
             if cnt >= 5:
-                self.winCount(stone)
+                # self.winCount(stone)
                 # print("player " + stone + " wins!!" self.win_history)
                 return True
         return False
@@ -110,12 +110,37 @@ class GameState(Env):
         return True
 
     def updatePlayerTurn(self, row, col):
+        done = 0
+        reward = 0
         if self.matrix[row][col] == 0:
             if self.player_turn % 2 == 0:
                 self.matrix[row][col] = StonePiece(row, col, 'black')
             elif self.player_turn % 2 == 1:
                 self.matrix[row][col] = StonePiece(row, col, 'white')
             self.player_turn += 1
+
+            done, reward = self.getReward(col, row)
+
+        return done, reward
+
+    def getReward(self, col, row):
+        done = 0
+        if self.is_gameOver(col, row, self.getColor(col, row)) == True:
+            if self.getPlayerTurn() >= self.dimension * self.dimension:  # Draw
+                reward = 0.5
+            elif self.getPlayerTurn() % 2 == 1:  # LOSE
+                reward = -1
+            else:
+                reward = 1  # RL win
+
+            done = 1
+            # self.print_history()
+            self.reset()
+        else:
+            reward = -0.01
+
+        return done, reward
+
 
     def getPlayerTurn(self):
         return self.player_turn
@@ -144,10 +169,10 @@ class GameState(Env):
         print(self.win_history)
 
     def generateSuccessor(self, action):
-        succss = self.deepCopy()
+        successor = self.deepCopy()
         x, y = action
-        succss.updatePlayerTurn(x, y)
-        return succss
+        done, reward = successor.updatePlayerTurn(x, y)
+        return successor, reward, done
 
     def getCenter(self):
         return (int(self.dimension/2), int(self.dimension/2))
@@ -191,7 +216,7 @@ class GameState(Env):
             reward = 0.0
 
         observation = self.get_observation()
-        return observation, reward, done, {}
+        return observation, reward, done
 
 
 class Grid:

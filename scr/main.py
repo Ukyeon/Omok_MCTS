@@ -2,12 +2,13 @@ import pygame as p
 import qlearningAgents
 import multiAgents
 from gameState import create_env
-# from dqn import run_dqn
+import sys
 from time import time, sleep
+
 
 WIDTH = 600
 HEIGHT = 600
-DIMENSION = 7
+DIMENSION = 9
 SQ_SIZE = HEIGHT / (DIMENSION-1)
 MAX_FPS = 15
 IMAGES = {}
@@ -32,7 +33,7 @@ def main():
     gs = create_env(dimension=DIMENSION-2)  #gameState.GameState(dimension=DIMENSION-2)
 
     # Initialize the Approximate Q-learning Agent
-    qa = qlearningAgents.ApproximateQAgent(alpha=0.002, gamma=0.96, dimension=DIMENSION-2)
+    qa = qlearningAgents.ApproximateQAgent(alpha=0.001, gamma=0.99, dimension=DIMENSION-2)
 
     load_images()
     num_steps = 100
@@ -53,41 +54,52 @@ def main():
     # Play mode
     while True:
         gs.reset_history()
-        cmd = input("Ready to play? (1: Human vs RL, 2: Human vs MinMax, 3: RL vs MinMax, 4: Quit) ")
+        cmd = input("Ready to play? (1: vs MinMax, 2: vs RL, 3: vs MCTS, 4: RL vs MinMax, 5: RL vs MCTS, 6: Quit) ")
         start_time = time()
         
         if cmd == '1':
             running = 1
-            agent = qa
+            agent = multiAgents.AlphaBetaAgent(depth=2, dimension=DIMENSION - 2)
             gs.reset()
         elif cmd == '2':
             running = 2
             gs.reset()
-            agent = multiAgents.AlphaBetaAgent(depth=3, dimension= DIMENSION-2)
+            agent = qa
         elif cmd == '3':
             running = 3
+            gs.reset()
+            agent = qlearningAgents.MCTSagent(depth=10000, exploration_weight=1, dimension=DIMENSION-2)
+        elif cmd == '4':
+            running = 4
             # gs.win_history = [0, 0, 0]
             gs.reset()
             ma = multiAgents.AlphaBetaAgent(depth=3, dimension= DIMENSION-2)
             ngames = int(input("How many times you want to run games for RL vs MinMax? "))
-        elif cmd == '4':
-            running = 4
+        elif cmd == '5':
+            running = 5
             gs.reset()
-            ma = qlearningAgents.MCTSagent(depth=2, exploration_weight=1, dimension= DIMENSION-2)
+            ma = qlearningAgents.MCTSagent(depth=20, exploration_weight=1, alpha=0.001, gamma=0.99, dimension=DIMENSION-2)
+            #qa = qlearningAgents.MCTSagent(depth=202, exploration_weight=1, alpha=0.001, gamma=0.99, dimension=DIMENSION-2)
             ngames = int(input("How many times you want to run games for RL vs MCTS? "))
         else:
             break
 
         while running > 0:
-            if running >= 3:  # AI mode
+            if running == 5:  # AI mode RL vs MCTS
                 qa.train_vs_AI(ngames, gs, qa, ma)
                 running = 0
                 gs.print_history()
                 qa.print()
 
-            else : # Player mode
+            elif running == 4:  # AI mode RL vs MinMax
+                qa.train_with_MinMax(ngames, gs, qa, ma)
+                running = 0
+                gs.print_history()
+                qa.print()
+
+            else:  # Player mode
                 prev_gs = gs.deepCopy()
-                if gs.getPlayerTurn() % 2 == 0 : # AI turn 
+                if gs.getPlayerTurn() % 2 == 0:  # AI turn
                     action = agent.getAction(gs)
                     col, row = action
 
@@ -108,9 +120,9 @@ def main():
 
                 gs.updatePlayerTurn(col, row)
                 
-                if gs.is_gameOver(col, row, gs.getColor(col, row)) == True:         
+                if gs.is_gameOver(col, row, gs.getColor(col, row)) == True:
                     running = False
-                
+
                     if gs.getPlayerTurn() >= gs.dimension * gs.dimension: # Draw
                         qa.update(prev_gs, action, gs, -1)
                         print("Game Over. Draw.")
@@ -173,5 +185,20 @@ def drawPieces(screen, board):
             if piece != 0:
                 screen.blit(IMAGES[piece.get_image_name()], p.Rect((c * SQ_SIZE)+SQ_SIZE/2, (r * SQ_SIZE)+SQ_SIZE/2, SQ_SIZE, SQ_SIZE))
 
-main()
 
+if __name__ == "__main__":
+    main()
+
+    # # Save the current stdout for later use
+    # original_stdout = sys.stdout
+    #
+    # # Path to your log file
+    # log_file_path = "logs.txt"
+    #
+    # # Redirecting stdout to the log file
+    # with open(log_file_path, 'w') as file:
+    #     sys.stdout = file  # Redirecting stdout to the file
+    #     main()
+    #
+    # # Reset stdout back to the original value
+    # sys.stdout = original_stdout

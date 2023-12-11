@@ -305,7 +305,7 @@ class ApproximateQAgent(OmokQAgent):
             # print(gs.win_history, "Please wait. Now learning...", i + 1, "/ 100")
             # gs.win_history = [0, 0, 0]
 
-    def train_vs_AI(self, num_games, gs, qa, ma):
+    def train_with_MinMax(self, num_games, gs, qa, ma):
         for i in trange(num_games, desc="ApproximateQAgent Learning"):
             studying = 1
             # explore_rate = 0.9 - (i * 0.001)
@@ -343,6 +343,37 @@ class ApproximateQAgent(OmokQAgent):
                         qa.update(prev_gs, action, gs, -1)
 
 
+    def train_vs_AI(self, num_games, gs, qa, ma):
+        for i in trange(num_games, desc="MCTS Learning"):
+            done = 0
+            # explore_rate = 0.9 - (i * 0.001)
+            exploration = ExponentialSchedule(1.0, 0.01, num_games)
+            self.explorationProb(exploration.value(i))
+
+            while not done:
+                prev_gs = gs.deepCopy()
+
+                if gs.getPlayerTurn() % 2 == 0:
+                    agent = ma
+                else:  # RL turn
+                    agent = qa
+
+                action = agent.getAction(gs)
+                col, row = action
+                gs.updatePlayerTurn(col, row)
+                done, reward = gs.getReward(col, row)
+                if agent == qa:
+                    qa.update(prev_gs, action, gs, reward)
+                if done:
+                    if reward == 0.5:
+                        gs.winCount('draw')
+                    elif agent == ma:
+                        gs.winCount('black')
+                    elif agent == qa:
+                        gs.winCount('white')
+                    gs.print_history()
+
+
     def print(self):
         """
            Debugging
@@ -351,113 +382,6 @@ class ApproximateQAgent(OmokQAgent):
         for key, value in self.weights.items():
             print(key, value)
 
-
-
-class MCTS:
-    "Monte Carlo tree searcher. First rollout the tree then choose a move."
-
-    def __init__(self, exploration_weight=1, **args):
-        OmokQAgent.__init__(self, **args)
-        self.Q = defaultdict(int)  # total reward of each node
-        self.N = defaultdict(int)  # total visit count for each node
-        self.children = dict()  # children of each node
-        self.exploration_weight = exploration_weight
-
-    def getAction(self, state):
-        "Choose the best successor of node. (Choose a move in the game)"
-        legalActions = self.getLegalActions(state)
-        if legalActions == []:
-            print("TERMINAL_STATE!!!!", state)
-            return None
-
-        def score(n):
-            if self.N[n] == 0:
-                return float("-inf")  # avoid unseen moves
-            return self.Q[n] / self.N[n]  # average reward
-
-        if state.getPlayerTurn() == 0:
-            return state.getCenter()
-        elif util.flipCoin(self.epsilon):  # To pick randomly from a list, especially in beginning
-            action = random.choice(legalActions)
-        else:
-            action = max(self.children[legalActions], key=score)  # self.getPolicy(state)
-
-        return action
-
-        # if node.is_terminal():
-        #     raise RuntimeError(f"choose called on terminal node {node}")
-        #
-        # if node not in self.children:
-        #     return node.find_random_child()
-        #
-        # def score(n):
-        #     if self.N[n] == 0:
-        #         return float("-inf")  # avoid unseen moves
-        #     return self.Q[n] / self.N[n]  # average reward
-        #
-        # return max(self.children[node], key=score)
-
-    def do_rollout(self, node):
-        "Make the tree one layer better. (Train for one iteration.)"
-        path = self._select(node)
-        leaf = path[-1]
-        self._expand(leaf)
-        reward = self._simulate(leaf)
-        self._backpropagate(path, reward)
-
-    def _select(self, node):
-        "Find an unexplored descendent of `node`"
-        path = []
-        while True:
-            path.append(node)
-            if node not in self.children or not self.children[node]:
-                # node is either unexplored or terminal
-                return path
-            unexplored = self.children[node] - self.children.keys()
-            if unexplored:
-                n = unexplored.pop()
-                path.append(n)
-                return path
-            node = self._uct_select(node)  # descend a layer deeper
-
-    def _expand(self, node):
-        "Update the `children` dict with the children of `node`"
-        if node in self.children:
-            return  # already expanded
-        self.children[node] = node.find_children()
-
-    def _simulate(self, node):
-        "Returns the reward for a random simulation (to completion) of `node`"
-        invert_reward = True
-        while True:
-            if node.is_terminal():
-                reward = node.reward()
-                return 1 - reward if invert_reward else reward
-            node = node.find_random_child()
-            invert_reward = not invert_reward
-
-    def _backpropagate(self, path, reward):
-        "Send the reward back up to the ancestors of the leaf"
-        for node in reversed(path):
-            self.N[node] += 1
-            self.Q[node] += reward
-            reward = 1 - reward  # 1 for me is 0 for my enemy, and vice versa
-
-    def _uct_select(self, node):
-        "Select a child of node, balancing exploration & exploitation"
-
-        # All children of node should already be expanded:
-        assert all(n in self.children for n in self.children[node])
-
-        log_N_vertex = math.log(self.N[node])
-
-        def uct(n):
-            "Upper confidence bound for trees"
-            return self.Q[n] / self.N[n] + self.exploration_weight * math.sqrt(
-                log_N_vertex / self.N[n]
-            )
-
-        return max(self.children[node], key=uct)
 
 class MCTSagent(OmokQAgent):
     """
@@ -468,10 +392,9 @@ class MCTSagent(OmokQAgent):
     """
     def __init__(self, depth, exploration_weight, **args):
         OmokQAgent.__init__(self, **args)
-        self.T = defaultdict(int)
+        self.T = defaultdict()
         self.depth = depth
         self.exploration_weight = exploration_weight
-        self.rolloutPolicy = self.epsilon_policy
         # self.Q = defaultdict()  # total reward of each node
         self.N = defaultdict()  # total visit count for each node
 
@@ -507,7 +430,8 @@ class MCTSagent(OmokQAgent):
 
         Takes in a list of values and returns the index of the item with the highest value, breaking ties randomly.
 
-        Note: np.argmax returns the first index that matches the maximum, so we define this method to use in EpsilonGreedy and UCB agents.
+        Note: np.argmax returns the first index that matches the maximum,
+            so we define this method to use in Epsilon Greedy and UCB agents.
         Args:
             arr: sequence of values
         """
@@ -516,16 +440,16 @@ class MCTSagent(OmokQAgent):
         max_index = [i for i, val in enumerate(arr) if max_value == val]
         return np.random.choice(max_index)
 
-    def selectAction(self, state, depth):
+    def getAction(self, state, depth=10):
         times = 10
         for i in range(times):
-            self.simulate(state, depth, self.epsilon_policy)
-        return self.getAction(state)
+            self.simulate(state, depth, 0)
+        return self.computeActionFromQValues(state)
 
-    def simulate(self, state, dept, policy):
+    def simulate(self, state, dept, done):
         "Roll out(simulate) using rollout policy pi0."
 
-        if dept == 0:
+        if dept == 0 or done:
             return 0
         if state not in self.T:
             legalActions = self.getLegalActions(state)
@@ -534,11 +458,23 @@ class MCTSagent(OmokQAgent):
                 self.N[(state, action)] = 0
                 # Q = defaultdict(lambda: np.zeros(env.action_space.n))
                 # N = defaultdict(lambda: np.zeros(env.action_space.n))
-            self.T.append(state)
-            return self.rollout(state, dept, policy)
+            self.T[state] = state.matrix
+            return self.rollout(state, dept, 0)
 
         action = self.selection(state)
+        next_state, reward, done = state.generateSuccessor(action)
+        q = reward + self.discount * self.simulate(next_state, dept-1, done)
+        self.N[(state, action)] = self.N[(state, action)] + 1
+        self.Q[(state, action)] = self.Q[(state, action)] + (q - self.Q[(state, action)]) / self.N[(state, action)]
+        return q
 
+    def rollout(self, state, dept, done):
+        if dept == 0 or done:
+            return 0
+
+        rollout_action = self.rolloutPolicy(state)
+        next_state, reward, done = state.generateSuccessor(rollout_action)
+        return reward + self.discount * self.rollout(next_state, dept-1, done)
 
     def selection(self, state):
         legalActions = self.getLegalActions(state)
@@ -548,8 +484,49 @@ class MCTSagent(OmokQAgent):
 
         # Define a function to calculate the equation for each action
         def ucb_tree(action):
+            if self.N[(state, action)] == 0:
+                return float("inf")
             return self.Q[(state, action)] + self.exploration_weight * math.sqrt(log_N_vertex / self.N[(state, action)])
 
         # Get the action with maximum value using max function with a custom key
         return max(legalActions, key=ucb_tree)
 
+    def rolloutPolicy(self, state):
+        "Choose the best successor of node. (Choose a move in the game)"
+        legalActions = self.getLegalActions(state)
+        if legalActions == []:
+            print("TERMINAL_STATE!!!!", state)
+            return None
+
+        if state.getPlayerTurn() == 0:
+            return state.getCenter()
+        else:  # the rollout is usually implemented following a uniform random policy
+            return random.choice(legalActions)
+
+    def train_vs_AI(self, num_games, gs, qa, ma):
+        for i in trange(num_games, desc="MCTS Learning"):
+            done = 0
+            # explore_rate = 0.9 - (i * 0.001)
+            exploration = ExponentialSchedule(1.0, 0.01, num_games)
+            self.explorationProb(exploration.value(i))
+
+            while not done:
+
+                if gs.getPlayerTurn() % 2 == 0:
+                    agent = ma
+                else:  # RL turn
+                    agent = qa
+
+                action = agent.getAction(gs)
+                col, row = action
+                gs.updatePlayerTurn(col, row)
+                done, reward = gs.getReward(col, row)
+
+                if done:
+                    if reward == 0.5:
+                        gs.winCount('draw')
+                    elif agent == ma:
+                        gs.winCount('black')
+                    elif agent == qa:
+                        gs.winCount('white')
+                    gs.print_history()
